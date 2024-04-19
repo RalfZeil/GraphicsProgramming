@@ -79,11 +79,11 @@
     <IncludePath>D:\_Libs\include\glfw;D:\_Libs\include\GLAD;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LibraryPath>D:\_Libs\lib\glfw;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\_Libs\lib\Debug;$(LibraryPath)</LibraryPath>
     <IncludePath>D:\_Libs\include\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LibraryPath>D:\_Libs\lib\glfw;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\_Libs\lib\Release;$(LibraryPath)</LibraryPath>
     <IncludePath>D:\_Libs\include\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
