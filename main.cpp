@@ -122,7 +122,7 @@ void createTriangle(GLuint& vao, int& size) {
 }
 
 void createShaders() {
-	createProgram(simpleProgram, "shaders/simpleVertex.shader", "shaders/simpleGragment.shader");
+	createProgram(simpleProgram, "shaders/simpleVertex.shader", "shaders/simpleFragment.shader");
 }
 
 void createProgram(GLuint& programID, const char* vertex, const char* fragment) {
