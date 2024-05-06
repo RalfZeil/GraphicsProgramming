@@ -57,7 +57,7 @@ int main()
 
 
 	glm::vec3 lightPosition = glm::vec3(0, 2.5f , 5.0f);
-	glm::vec4 lightColor = glm::vec4(1, 1, 1, 1);
+	glm::vec4 lightColor = glm::vec4(0.0f, 0.5f, 1.0f, 1.0f);
 	glm::vec3 cameraPosition = glm::vec3(0, 2.4f, -5.0f);
 
 	// Matrices!
@@ -91,7 +91,7 @@ int main()
 		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
 		glUniform3fv(glGetUniformLocation(simpleProgram, "lightPosition"), 1, glm::value_ptr(lightPosition));
-		glUniform3fv(glGetUniformLocation(simpleProgram, "lightColor"), 1, glm::value_ptr(lightColor));
+		glUniform4fv(glGetUniformLocation(simpleProgram, "lightColor"), 1, glm::value_ptr(lightColor));
 		glUniform3fv(glGetUniformLocation(simpleProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
 
 		glActiveTexture(GL_TEXTURE0);
