@@ -9,6 +9,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include "model.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -23,10 +25,11 @@ int init(GLFWwindow* &window);
 void createGeometry(GLuint &vao, GLuint &EBO, int &size, int& numIndices);
 void createShaders();
 void createProgram(GLuint& programID, const char* vertex, const char* fragment);
-GLuint loadTexture(const char* path);
+GLuint loadTexture(const char* path, int comp = 0);
 void renderSkyBox();
 void renderPlane();
-unsigned int GeneratePlane(const char* heightmap, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID);
+void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale);
+unsigned int GeneratePlane(const char* heightmap, unsigned char* &data, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID);
 
 // Util
 void loadFile(const char* filename, char*& output);
@@ -38,6 +41,7 @@ bool keys[1024];
 GLuint simpleProgram;
 GLuint skyProgram;
 GLuint terrainProgram;
+GLuint modelProgram;
 
 const int WIDTH = 1280, HEIGHT = 720;
 
@@ -56,7 +60,12 @@ float camYaw, camPitch;
 glm::quat camQuat = glm::quat(glm::vec3(glm::radians(camPitch), glm::radians(camYaw), 0));;
 
 // Terrain data
-GLuint terrainVAO, terrainIndexCount, heightmapID;
+GLuint terrainVAO, terrainIndexCount, heightmapID, heightmapNormalID;
+unsigned char* heightmapTexture;
+
+GLuint dirt, sand, grass, rock, snow;
+
+Model* backpack;
 
 int main()
 {
@@ -64,25 +73,31 @@ int main()
 
 	int res = init(window);
 	if (res != 0) { return res; }
+
+	stbi_set_flip_vertically_on_load(true);
 	
 	createGeometry(boxVAO, boxEBO, boxSize, boxIndexCount);
 	createShaders();
 
-	terrainVAO = GeneratePlane("textures/heightmap.png", GL_RGBA, 4, 100.0, 5.0f, terrainIndexCount, heightmapID);
+	terrainVAO = GeneratePlane("resources/textures/heightmap.png", heightmapTexture, GL_RGBA, 4, 100.0, 5.0f, terrainIndexCount, heightmapID);
+	heightmapNormalID = loadTexture("resources/textures/heightmap_normal.png");
 
-	GLuint boxTexture = loadTexture("textures/container2.png");
-	GLuint boxNormal  = loadTexture("textures/container2_normal.png");
+	GLuint boxTexture = loadTexture("resources/textures/container2.png");
+	GLuint boxNormal  = loadTexture("resources/textures/container2_normal.png");
 
-	// Set texture channels
-	glUseProgram(simpleProgram);
-	glUniform1i(glGetUniformLocation(simpleProgram, "mainTex"), 0);
-	glUniform1i(glGetUniformLocation(simpleProgram, "normalTex"), 1);
+	dirt = loadTexture("resources/textures/dirt.jpg");
+	grass = loadTexture("resources/textures/grass.png", 4);
+	sand = loadTexture("resources/textures/sand.jpg");
+	rock = loadTexture("resources/textures/rock.jpg");
+	snow = loadTexture("resources/textures/snow.jpg");
+
+	backpack = new Model("resources/models/backpack/backpack.obj");
 
 	// Create viewport
 	glViewport(0, 0, WIDTH, HEIGHT);
 	glEnable(GL_CULL_FACE);
 
-	// Matrices!
+	// Camera Matrices
 	view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	projection = glm::perspective(glm::radians(60.0f), WIDTH / (float)HEIGHT, 0.1f, 5000.0f);
 
@@ -99,10 +114,14 @@ int main()
 
 		// Rendering
 		glClearColor(0.1f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		renderSkyBox();
 		renderPlane();
+
+		float t = glfwGetTime() * 10;
+
+		renderModel(backpack, glm::vec3(1000, 100, 1000), glm::vec3(0,t,0), glm::vec3(100, 100, 100));
 
 		//glUseProgram(simpleProgram);
 
@@ -137,6 +156,7 @@ int main()
 void renderSkyBox() {
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH);
+	glDisable(GL_DEPTH_TEST);
 
 	glUseProgram(skyProgram);
 
@@ -147,6 +167,10 @@ void renderSkyBox() {
 	glUniformMatrix4fv(glGetUniformLocation(skyProgram, "world"), 1, GL_FALSE, glm::value_ptr(world));
 	glUniformMatrix4fv(glGetUniformLocation(skyProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(glGetUniformLocation(skyProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+	float t = glfwGetTime();
+	//lightDirection = glm::normalize(glm::vec3(glm::sin(t), -0.5, glm::cos(t)));
+	lightColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 	glUniform3fv(glGetUniformLocation(skyProgram, "lightDirection"), GL_TRUE, glm::value_ptr(lightDirection));
 	glUniform4fv(glGetUniformLocation(skyProgram, "lightColor"), GL_FALSE, glm::value_ptr(lightColor));
 	glUniform3fv(glGetUniformLocation(skyProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
@@ -157,18 +181,18 @@ void renderSkyBox() {
 
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH);
+	glEnable(GL_DEPTH_TEST);
 }
 
 void renderPlane() {
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH);
+	glEnable(GL_DEPTH_TEST);
 	glCullFace(GL_BACK);
 
 	glUseProgram(terrainProgram);
 
 	glm::mat4 world = glm::mat4(1.0f);
-	world = glm::translate(world, cameraPosition);
-	world = glm::scale(world, glm::vec3(10, 10, 10));
 
 	glUniformMatrix4fv(glGetUniformLocation(terrainProgram, "world"), 1, GL_FALSE, glm::value_ptr(world));
 	glUniformMatrix4fv(glGetUniformLocation(terrainProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
@@ -179,15 +203,66 @@ void renderPlane() {
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, heightmapID);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, heightmapNormalID);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, dirt);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, grass);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, sand);
+	glActiveTexture(GL_TEXTURE5);
+	glBindTexture(GL_TEXTURE_2D, rock);
+	glActiveTexture(GL_TEXTURE6);
+	glBindTexture(GL_TEXTURE_2D, snow);
 
 	// Rendering
 	glBindVertexArray(terrainVAO);
 	glDrawElements(GL_TRIANGLES, terrainIndexCount, GL_UNSIGNED_INT, 0);
 }
 
-unsigned int GeneratePlane(const char* heightmap, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID) {
+void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale)
+{
+	glEnable(GL_BLEND);
+	//alpha blend
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//additive blend
+	//glBlendFunc(GL_ONE, GL_ONE);
+	//soft additive blend
+	//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE);
+	//multiply blend
+	glBlendFunc(GL_DST_COLOR, GL_ZERO);
+	//double multiply bled
+	glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	glUseProgram(modelProgram);
+
+	glm::mat4 world = glm::mat4(1.0f);
+	world = glm::translate(world, pos);
+	world = world * glm::toMat4(glm::quat(glm::radians(rot)));
+	world = glm::scale(world, scale);
+
+	glUniformMatrix4fv(glGetUniformLocation(modelProgram, "world"), 1, GL_FALSE, glm::value_ptr(world));
+	glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+	glUniform3fv(glGetUniformLocation(modelProgram, "lightDirection"), GL_TRUE, glm::value_ptr(lightDirection));
+	glUniform4fv(glGetUniformLocation(modelProgram, "lightColor"), GL_FALSE, glm::value_ptr(lightColor));
+	glUniform3fv(glGetUniformLocation(modelProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
+
+	model->Draw(modelProgram);
+
+	glDisable(GL_BLEND);
+}
+
+unsigned int GeneratePlane(const char* heightmap, unsigned char* &data, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID) {
 	int width, height, channels;
-	unsigned char* data = nullptr;
+	data = nullptr;
 	if (heightmap != nullptr) {
 		data = stbi_load(heightmap, &width, &height, &channels, comp);
 		if (data) {
@@ -213,9 +288,11 @@ unsigned int GeneratePlane(const char* heightmap, GLenum format, int comp, float
 		int x = i % width;
 		int z = i / width;
 
+		float texHeight = (float)data[i * comp];
+
 		// TODO: set position
 		vertices[index++] = x * xzScale;
-		vertices[index++] = 0;
+		vertices[index++] = (texHeight / 255.0f) * hScale;
 		vertices[index++] = z * xzScale;
 
 		// TODO: set normal
@@ -281,7 +358,7 @@ unsigned int GeneratePlane(const char* heightmap, GLenum format, int comp, float
 	delete[] vertices;
 	delete[] indices;
 
-	stbi_image_free(data);
+	// stbi_image_free(data);
 
 	return VAO;
 }
@@ -344,7 +421,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 	glm::vec3 camForward = camQuat * glm::vec3(0, 0, 1);
 	glm::vec3 camUp = camQuat * glm::vec3(0, 1, 0);
 	view = glm::lookAt(cameraPosition, cameraPosition + camForward, camUp);
-
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -367,7 +443,7 @@ void processInput(GLFWwindow* window)
 		camChanged = true;
 	}
 	if (keys[GLFW_KEY_A]) {
-		cameraPosition += camQuat * glm::vec3(-1, 0, 1);
+		cameraPosition += camQuat * glm::vec3(1, 0, 0);
 		camChanged = true;
 	}
 	if (keys[GLFW_KEY_S]) {
@@ -375,7 +451,7 @@ void processInput(GLFWwindow* window)
 		camChanged = true;
 	}
 	if (keys[GLFW_KEY_D]) {
-		cameraPosition += camQuat * glm::vec3(1, 0, 1);
+		cameraPosition += camQuat * glm::vec3(-1, 0, 0);
 		camChanged = true;
 	}
 
@@ -385,6 +461,7 @@ void processInput(GLFWwindow* window)
 		view = glm::lookAt(cameraPosition, cameraPosition + camForward, camUp);
 	}
 }
+
 void createGeometry(GLuint& vao, GLuint &EBO, int& size, int& numIndices) {
 	// need 24 vertices for normal/uv-mapped Cube
 	float vertices[] = {
@@ -492,9 +569,36 @@ void createGeometry(GLuint& vao, GLuint &EBO, int& size, int& numIndices) {
 }
 
 void createShaders() {
-	createProgram(simpleProgram, "shaders/simpleVertex.shader", "shaders/simpleFragment.shader");
-	createProgram(skyProgram, "shaders/skyVertex.shader", "shaders/skyFragment.shader");
-	createProgram(terrainProgram, "shaders/terrainVertex.shader", "shaders/terrainFragment.shader");
+	createProgram(simpleProgram, "resources/shaders/simpleVertex.shader", "resources/shaders/simpleFragment.shader");
+	// Set texture channels
+	glUseProgram(simpleProgram);
+	glUniform1i(glGetUniformLocation(simpleProgram, "mainTex"), 0);
+	glUniform1i(glGetUniformLocation(simpleProgram, "normalTex"), 1);
+
+	createProgram(skyProgram, "resources/shaders/skyVertex.shader", "resources/shaders/skyFragment.shader");
+	createProgram(terrainProgram, "resources/shaders/terrainVertex.shader", "resources/shaders/terrainFragment.shader");
+	// Set texture channels
+	glUseProgram(terrainProgram);
+	glUniform1i(glGetUniformLocation(terrainProgram, "mainTex"), 0);
+	glUniform1i(glGetUniformLocation(terrainProgram, "normalTex"), 1);
+
+	glUniform1i(glGetUniformLocation(terrainProgram, "dirt"), 2);
+	glUniform1i(glGetUniformLocation(terrainProgram, "grass"), 3);
+	glUniform1i(glGetUniformLocation(terrainProgram, "sand"), 4);
+	glUniform1i(glGetUniformLocation(terrainProgram, "rock"), 5);
+	glUniform1i(glGetUniformLocation(terrainProgram, "snow"), 6);
+
+	createProgram(modelProgram, "resources/shaders/model.vs", "resources/shaders/model.fs");
+	glUseProgram(modelProgram);
+
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_diffuse1"), 0);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_specular1"), 1);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_normal1"), 2);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_roughness1"), 3);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_ao1"), 4);
+
+
+
 }
 
 void createProgram(GLuint& programID, const char* vertex, const char* fragment) {
@@ -587,7 +691,7 @@ void loadFile(const char* filename, char*& output) {
 	}
 }
 
-GLuint loadTexture(const char* path) {
+GLuint loadTexture(const char* path, int comp) {
 	GLuint textureID;
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_2D, textureID);
@@ -596,8 +700,10 @@ GLuint loadTexture(const char* path) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	int width, height, numChannels;
-	unsigned char* data = stbi_load(path, &width, &height, &numChannels, 0);
+	unsigned char* data = stbi_load(path, &width, &height, &numChannels, comp);
 	if (data) {
+		if(comp != 0) numChannels = comp;
+
 		if(numChannels == 3)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
 		if(numChannels == 4)
