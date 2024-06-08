@@ -66,6 +66,7 @@ unsigned char* heightmapTexture;
 GLuint dirt, sand, grass, rock, snow;
 
 Model* backpack;
+Model* tree;
 
 int main()
 {
@@ -92,6 +93,7 @@ int main()
 	snow = loadTexture("resources/textures/snow.jpg");
 
 	backpack = new Model("resources/models/backpack/backpack.obj");
+	tree = new Model("resources/models/tree/tree.obj");
 
 	// Create viewport
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -119,9 +121,12 @@ int main()
 		renderSkyBox();
 		renderPlane();
 
-		float t = glfwGetTime() * 10;
 
-		renderModel(backpack, glm::vec3(1000, 100, 1000), glm::vec3(0,t,0), glm::vec3(100, 100, 100));
+		renderModel(backpack, glm::vec3(242, 10, 250), glm::vec3(-20, -90, 0), glm::vec3(2, 2, 2));
+
+		renderModel(tree, glm::vec3(250, 0, 250), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
+		renderModel(tree, glm::vec3(250, 0, 150), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
+		renderModel(tree, glm::vec3(150, 0, 250), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
 
 		//glUseProgram(simpleProgram);
 
@@ -224,7 +229,7 @@ void renderPlane() {
 
 void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale)
 {
-	glEnable(GL_BLEND);
+	//glEnable(GL_BLEND);
 	//alpha blend
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//additive blend
@@ -232,9 +237,9 @@ void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale)
 	//soft additive blend
 	//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE);
 	//multiply blend
-	glBlendFunc(GL_DST_COLOR, GL_ZERO);
+	//glBlendFunc(GL_DST_COLOR, GL_ZERO);
 	//double multiply bled
-	glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
+	//glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_DEPTH);

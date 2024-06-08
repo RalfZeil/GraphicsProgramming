@@ -58,12 +58,12 @@ void main()
 
     vec3 fogColor = lerp(botColor, topColot, max(viewDir.y, 0.0));
     
-    vec4 output = lerp(diffuse * max(light * ambientOcclusion, 0.2 * ambientOcclusion) + vec4(specular, 0), vec4(fogColor, 1.0), fog);
+    vec4 tmpOutput = lerp(diffuse * max(light * ambientOcclusion, 0.2 * ambientOcclusion) + vec4(specular, 0), vec4(fogColor, 1.0), fog);
     
     //Clip at threshold
-    if(output.a < 0.5) {
+    if(tmpOutput.a < 0.0001) {
         discard;
     }
 
-    FragColor = output;
+    FragColor = tmpOutput;
 }
