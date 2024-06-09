@@ -34,8 +34,8 @@ void main()
 
     vec3 finalColor = color * lightColor.rgb;
 
-    vec4 output = vec4(finalColor, 1.0f) * texture(mainTex, uv);
-    output.rgb = (output.rgb) * min(lightValue + 0.3, 1.0) + specular * output.rgb;
+    vec4 tmpOutput = vec4(finalColor, 1.0f) * texture(mainTex, uv);
+    tmpOutput.rgb = (tmpOutput.rgb) * min(lightValue + 0.3, 1.0) + specular * tmpOutput.rgb;
 
-    FragColor = output;
+    FragColor = tmpOutput;
 }
