@@ -25,11 +25,8 @@ int init(GLFWwindow* &window);
 void createGeometry(GLuint &vao, GLuint &EBO, int &size, int& numIndices);
 void createShaders();
 void createProgram(GLuint& programID, const char* vertex, const char* fragment);
-void createProgram(GLuint& programID, const char* vertex, const char* fragment, const char* geometry);
 GLuint loadTexture(const char* path, int comp = 0);
-GLuint loadCubemap(std::vector<string> fileNames, int comp = 0);
 void renderSkyBox();
-void renderStarBox();
 void renderPlane();
 void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale);
 unsigned int GeneratePlane(const char* heightmap, unsigned char* &data, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID);
@@ -45,7 +42,6 @@ GLuint simpleProgram;
 GLuint skyProgram;
 GLuint terrainProgram;
 GLuint modelProgram;
-GLuint starProgram;
 
 const int WIDTH = 1280, HEIGHT = 720;
 
@@ -68,12 +64,9 @@ GLuint terrainVAO, terrainIndexCount, heightmapID, heightmapNormalID;
 unsigned char* heightmapTexture;
 
 GLuint dirt, sand, grass, rock, snow;
-GLuint cubeMap;
 
 Model* backpack;
 Model* tree;
-
-GLuint voxelTextureID;
 
 int main()
 {
@@ -81,37 +74,26 @@ int main()
 
 	int res = init(window);
 	if (res != 0) { return res; }
+
+	stbi_set_flip_vertically_on_load(true);
 	
 	createGeometry(boxVAO, boxEBO, boxSize, boxIndexCount);
 	createShaders();
 
-	// terrainVAO = GeneratePlane("resources/textures/heightmap.png", heightmapTexture, GL_RGBA, 4, 100.0, 5.0f, terrainIndexCount, heightmapID);
-	// heightmapNormalID = loadTexture("resources/textures/heightmap_normal.png");
+	terrainVAO = GeneratePlane("resources/textures/heightmap.png", heightmapTexture, GL_RGBA, 4, 100.0, 5.0f, terrainIndexCount, heightmapID);
+	heightmapNormalID = loadTexture("resources/textures/heightmap_normal.png");
 
-	// GLuint boxTexture = loadTexture("resources/textures/container2.png");
-	// GLuint boxNormal  = loadTexture("resources/textures/container2_normal.png");
+	GLuint boxTexture = loadTexture("resources/textures/container2.png");
+	GLuint boxNormal  = loadTexture("resources/textures/container2_normal.png");
 
-	/*dirt = loadTexture("resources/textures/dirt.jpg");
+	dirt = loadTexture("resources/textures/dirt.jpg");
 	grass = loadTexture("resources/textures/grass.png", 4);
 	sand = loadTexture("resources/textures/sand.jpg");
 	rock = loadTexture("resources/textures/rock.jpg");
-	snow = loadTexture("resources/textures/snow.jpg");*/
+	snow = loadTexture("resources/textures/snow.jpg");
 
 	backpack = new Model("resources/models/backpack/backpack.obj");
-	//tree = new Model("resources/models/tree/tree.obj");*/
-
-	std::vector<string> fileNames = {
-		"resources/textures/space-cubemap/right.png",
-		"resources/textures/space-cubemap/left.png",
-		"resources/textures/space-cubemap/top.png",
-		"resources/textures/space-cubemap/bottom.png",
-		"resources/textures/space-cubemap/front.png",
-		"resources/textures/space-cubemap/back.png"
-	};
-
-	//stbi_set_flip_vertically_on_load(true);
-
-	cubeMap = loadCubemap(fileNames);
+	tree = new Model("resources/models/tree/tree.obj");
 
 	// Create viewport
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -136,11 +118,36 @@ int main()
 		glClearColor(0.1f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// renderStarBox();
-		// renderPlane();
+		renderSkyBox();
+		renderPlane();
 
 
-		renderModel(backpack, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
+		renderModel(backpack, glm::vec3(242, 10, 250), glm::vec3(-20, -90, 0), glm::vec3(2, 2, 2));
+
+		renderModel(tree, glm::vec3(250, 0, 250), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
+		renderModel(tree, glm::vec3(250, 0, 150), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
+		renderModel(tree, glm::vec3(150, 0, 250), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
+
+		//glUseProgram(simpleProgram);
+
+		/*
+		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "world"), 1, GL_FALSE, glm::value_ptr(world));
+		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+		glUniform3fv(glGetUniformLocation(simpleProgram, "lightPosition"), 1, glm::value_ptr(lightDirection));
+		glUniform4fv(glGetUniformLocation(simpleProgram, "lightColor"), 1, glm::value_ptr(lightColor));
+		glUniform3fv(glGetUniformLocation(simpleProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
+		
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, boxTexture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, boxNormal);
+
+		glBindVertexArray(triangleVAO);
+		glDrawElements(GL_TRIANGLES, triangleIndexCount, GL_UNSIGNED_INT, 0);
+		*/
 
 		// check and call events and swap the buffers
 		glfwPollEvents();
@@ -172,38 +179,6 @@ void renderSkyBox() {
 	glUniform3fv(glGetUniformLocation(skyProgram, "lightDirection"), GL_TRUE, glm::value_ptr(lightDirection));
 	glUniform4fv(glGetUniformLocation(skyProgram, "lightColor"), GL_FALSE, glm::value_ptr(lightColor));
 	glUniform3fv(glGetUniformLocation(skyProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
-
-	//Rendering
-	glBindVertexArray(boxVAO);
-	glDrawElements(GL_TRIANGLES, boxIndexCount, GL_UNSIGNED_INT, 0);
-
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH);
-	glEnable(GL_DEPTH_TEST);
-}
-
-void renderStarBox() {
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_DEPTH);
-	glDisable(GL_DEPTH_TEST);
-
-	glUseProgram(starProgram);
-
-	glm::mat4 world = glm::mat4(1.0f);
-	world = glm::translate(world, cameraPosition);
-	world = glm::scale(world, glm::vec3(10, 10, 10));
-
-	glUniformMatrix4fv(glGetUniformLocation(starProgram, "world"), 1, GL_FALSE, glm::value_ptr(world));
-	glUniformMatrix4fv(glGetUniformLocation(starProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(glGetUniformLocation(starProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-
-	float t = glfwGetTime();
-	//lightDirection = glm::normalize(glm::vec3(glm::sin(t), -0.5, glm::cos(t)));
-	glUniform3fv(glGetUniformLocation(starProgram, "lightDirection"), GL_TRUE, glm::value_ptr(lightDirection));
-	glUniform3fv(glGetUniformLocation(starProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
 
 	//Rendering
 	glBindVertexArray(boxVAO);
@@ -254,6 +229,18 @@ void renderPlane() {
 
 void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale)
 {
+	//glEnable(GL_BLEND);
+	//alpha blend
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//additive blend
+	//glBlendFunc(GL_ONE, GL_ONE);
+	//soft additive blend
+	//glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE);
+	//multiply blend
+	//glBlendFunc(GL_DST_COLOR, GL_ZERO);
+	//double multiply bled
+	//glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
+
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_DEPTH);
 	glEnable(GL_CULL_FACE);
@@ -273,13 +260,9 @@ void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale)
 	glUniform4fv(glGetUniformLocation(modelProgram, "lightColor"), GL_FALSE, glm::value_ptr(lightColor));
 	glUniform3fv(glGetUniformLocation(modelProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
 
-	glUniform3iv(glGetUniformLocation(modelProgram, "voxelResolution"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
-
-	// Render the model
 	model->Draw(modelProgram);
 
-	// Clean up
-	glDeleteTextures(1, &voxelTextureID); // Don't forget to delete texture when done
+	glDisable(GL_BLEND);
 }
 
 unsigned int GeneratePlane(const char* heightmap, unsigned char* &data, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID) {
@@ -613,14 +596,12 @@ void createShaders() {
 	createProgram(modelProgram, "resources/shaders/model.vs", "resources/shaders/model.fs");
 	glUseProgram(modelProgram);
 
-	glUniform1i(glGetUniformLocation(modelProgram, "texture_diffuse1"), 0);
-	glUniform1i(glGetUniformLocation(modelProgram, "texture_specular1"), 1);
-	glUniform1i(glGetUniformLocation(modelProgram, "texture_normal1"), 2);
-	glUniform1i(glGetUniformLocation(modelProgram, "texture_roughness1"), 3);
-	glUniform1i(glGetUniformLocation(modelProgram, "texture_ao1"), 4);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_diffuse1"), 0);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_specular1"), 1);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_normal1"), 2);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_roughness1"), 3);
+	glUniform1i(glGetUniformLocation(terrainProgram, "texture_ao1"), 4);
 
-
-	createProgram(starProgram, "resources/shaders/skyVertex.shader", "resources/shaders/starBox.fs");
 
 
 }
@@ -686,88 +667,6 @@ void createProgram(GLuint& programID, const char* vertex, const char* fragment) 
 	delete fragmentSrc;
 }
 
-void createProgram(GLuint& programID, const char* vertex, const char* fragment, const char* geometry) {
-	char* vertexSrc;
-	char* fragmentSrc;
-	char* geometrySrc;
-
-	// Load vertex shader source
-	loadFile(vertex, vertexSrc);
-	if (vertexSrc == nullptr) {
-		std::cout << "Failed to load vertex shader source." << std::endl;
-		return;
-	}
-
-	// Load fragment shader source
-	loadFile(fragment, fragmentSrc);
-	if (fragmentSrc == nullptr) {
-		std::cout << "Failed to load fragment shader source." << std::endl;
-		return;
-	}
-
-	// Load fragment shader source
-	loadFile(geometry, geometrySrc);
-	if (geometrySrc == nullptr) {
-		std::cout << "Failed to load geometry shader source." << std::endl;
-		return;
-	}
-
-	GLuint vertexShaderID, fragmentShaderID, geometryShaderID;
-
-	vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShaderID, 1, &vertexSrc, nullptr);
-	glCompileShader(vertexShaderID);
-
-	int success;
-	char infoLog[512];
-	glGetShaderiv(vertexShaderID, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(vertexShaderID, 512, nullptr, infoLog);
-		std::cout << "ERROR COMPILING VERTEX SHADER\n" << infoLog << std::endl;
-	}
-
-	fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShaderID, 1, &fragmentSrc, nullptr);
-	glCompileShader(fragmentShaderID);
-
-	glGetShaderiv(fragmentShaderID, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragmentShaderID, 512, nullptr, infoLog);
-		std::cout << "ERROR COMPILING FRAGMENT SHADER\n" << infoLog << std::endl;
-	}
-
-	geometryShaderID = glCreateShader(GL_GEOMETRY_SHADER);
-	glShaderSource(geometryShaderID, 1, &geometrySrc, nullptr);
-	glCompileShader(geometryShaderID);
-
-	glGetShaderiv(geometryShaderID, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(geometryShaderID, 512, nullptr, infoLog);
-		std::cout << "ERROR COMPILING GEOMETRY SHADER\n" << infoLog << std::endl;
-	}
-
-
-	programID = glCreateProgram();
-	glAttachShader(programID, vertexShaderID);
-	glAttachShader(programID, fragmentShaderID);
-	glAttachShader(programID, geometryShaderID);
-	glLinkProgram(programID);
-
-	glGetProgramiv(programID, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(programID, 512, nullptr, infoLog);
-		std::cout << "ERROR LINKING PROGRAM\n" << infoLog << std::endl;
-	}
-
-	glDeleteShader(vertexShaderID);
-	glDeleteShader(fragmentShaderID);
-	glDeleteShader(geometryShaderID);
-
-	delete vertexSrc;
-	delete fragmentSrc;
-	delete geometrySrc;
-}
-
 void loadFile(const char* filename, char*& output) {
 	// open the file
 	std::ifstream file(filename, std::ios::binary);
@@ -824,41 +723,5 @@ GLuint loadTexture(const char* path, int comp) {
 	stbi_image_free(data);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	return textureID;
-}
-
-GLuint loadCubemap(std::vector<string> fileNames, int comp)
-{
-	GLuint textureID;
-	glGenTextures(1, &textureID);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
-
-	int width, height, numChannels;
-	for (int i = 0; i < fileNames.size(); i++) 
-	{
-		unsigned char* data = stbi_load(fileNames[i].c_str(), &width, &height, &numChannels, comp);
-
-		if (data) {
-			if (comp != 0) numChannels = comp;
-
-			if (numChannels == 3)
-				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-			if (numChannels == 4)
-				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-		}
-		else {
-			std::cout << "Error loading texture: " << fileNames[i].c_str() << std::endl;
-		}
-
-		stbi_image_free(data);
-	}
-
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	return textureID;
 }
