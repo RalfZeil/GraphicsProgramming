@@ -168,11 +168,13 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\shaders\model.fs" />
+    <None Include="resources\shaders\model.gs" />
     <None Include="resources\shaders\model.vs" />
     <None Include="resources\shaders\simpleFragment.shader" />
     <None Include="resources\shaders\simpleVertex.shader" />
     <None Include="resources\shaders\skyFragment.shader" />
     <None Include="resources\shaders\skyVertex.shader" />
+    <None Include="resources\shaders\StarBox.fs" />
     <None Include="resources\shaders\terrainFragment.shader" />
     <None Include="resources\shaders\terrainVertex.shader" />
     <None Include="shaders\model.fs" />
