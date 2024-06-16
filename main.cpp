@@ -142,10 +142,6 @@ int main()
 
 		// Post Processing
 		renderToBuffer(frameBuf2, colorBuf1, blurProgram);
-		renderToBuffer(frameBuf1, colorBuf2, blurProgram);
-		renderToBuffer(frameBuf2, colorBuf1, blurProgram);
-		renderToBuffer(frameBuf1, colorBuf2, blurProgram);
-		renderToBuffer(frameBuf2, colorBuf1, blurProgram);
 		renderToBuffer(0, colorBuf2, blitProgram);
 
 		// Swap buffers and poll events
