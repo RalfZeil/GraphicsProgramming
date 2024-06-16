@@ -167,6 +167,10 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="resources\shaders\bloom.fs" />
+    <None Include="resources\shaders\blur.fs" />
+    <None Include="resources\shaders\image.fs" />
+    <None Include="resources\shaders\image.vs" />
     <None Include="resources\shaders\model.fs" />
     <None Include="resources\shaders\model.vs" />
     <None Include="resources\shaders\simpleFragment.shader" />

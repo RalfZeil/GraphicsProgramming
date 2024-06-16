@@ -31,6 +31,10 @@ void renderPlane();
 void renderModel(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scale);
 unsigned int GeneratePlane(const char* heightmap, unsigned char* &data, GLenum format, int comp, float hScale, float xzScale, unsigned int& indexCount, unsigned int& heightmapID);
 
+void createFrameBuffer(int width, int height, unsigned int& frameBufferID, unsigned int& colorBufferID, unsigned int& depthBufferID);
+void renderToBuffer(unsigned int frameBufferTo, unsigned int colorBufferFrom, unsigned int shader);
+void renderQuad();
+
 // Util
 void loadFile(const char* filename, char*& output);
 
@@ -42,6 +46,9 @@ GLuint simpleProgram;
 GLuint skyProgram;
 GLuint terrainProgram;
 GLuint modelProgram;
+GLuint blitProgram;
+GLuint bloomProgram;
+GLuint blurProgram;
 
 const int WIDTH = 1280, HEIGHT = 720;
 
@@ -103,56 +110,50 @@ int main()
 	view = glm::lookAt(cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	projection = glm::perspective(glm::radians(60.0f), WIDTH / (float)HEIGHT, 0.1f, 5000.0f);
 
+	// Framebuffers
+	unsigned int frameBuf1, frameBuf2, colorBuf1, colorBuf2, depthBuf1, depthBuf2;
+
+	createFrameBuffer(WIDTH, HEIGHT, frameBuf1, colorBuf1, depthBuf1);
+	createFrameBuffer(WIDTH, HEIGHT, frameBuf2, colorBuf2, depthBuf2);
+
 	// Setup callback
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetKeyCallback(window, key_callback);
 
-	// Render loop
 	while (!glfwWindowShouldClose(window))
 	{
 		// Input
 		processInput(window);
 
 		// Rendering
+		glBindFramebuffer(GL_FRAMEBUFFER, frameBuf1);
 		glClearColor(0.1f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		renderSkyBox();
 		renderPlane();
-
-
 		renderModel(backpack, glm::vec3(242, 10, 250), glm::vec3(-20, -90, 0), glm::vec3(2, 2, 2));
-
 		renderModel(tree, glm::vec3(250, 0, 250), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
 		renderModel(tree, glm::vec3(250, 0, 150), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
 		renderModel(tree, glm::vec3(150, 0, 250), glm::vec3(0, 0, 0), glm::vec3(30, 30, 30));
 
-		//glUseProgram(simpleProgram);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-		/*
-		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "world"), 1, GL_FALSE, glm::value_ptr(world));
-		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-		glUniformMatrix4fv(glGetUniformLocation(simpleProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+		// Post Processing
+		renderToBuffer(frameBuf2, colorBuf1, blurProgram);
+		renderToBuffer(frameBuf1, colorBuf2, blurProgram);
+		renderToBuffer(frameBuf2, colorBuf1, blurProgram);
+		renderToBuffer(frameBuf1, colorBuf2, blurProgram);
+		renderToBuffer(frameBuf2, colorBuf1, blurProgram);
+		renderToBuffer(0, colorBuf2, blitProgram);
 
-		glUniform3fv(glGetUniformLocation(simpleProgram, "lightPosition"), 1, glm::value_ptr(lightDirection));
-		glUniform4fv(glGetUniformLocation(simpleProgram, "lightColor"), 1, glm::value_ptr(lightColor));
-		glUniform3fv(glGetUniformLocation(simpleProgram, "cameraPosition"), 1, glm::value_ptr(cameraPosition));
-		
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, boxTexture);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, boxNormal);
-
-		glBindVertexArray(triangleVAO);
-		glDrawElements(GL_TRIANGLES, triangleIndexCount, GL_UNSIGNED_INT, 0);
-		*/
-
-		// check and call events and swap the buffers
-		glfwPollEvents();
+		// Swap buffers and poll events
 		glfwSwapBuffers(window);
+		glfwPollEvents();
 	}
+
+
 
     glfwTerminate();
     return 0;
@@ -602,6 +603,10 @@ void createShaders() {
 	glUniform1i(glGetUniformLocation(terrainProgram, "texture_roughness1"), 3);
 	glUniform1i(glGetUniformLocation(terrainProgram, "texture_ao1"), 4);
 
+	createProgram(blitProgram, "resources/shaders/image.vs", "resources/shaders/image.fs");
+	createProgram(bloomProgram , "resources/shaders/image.vs", "resources/shaders/bloom.fs");
+	createProgram(blurProgram, "resources/shaders/image.vs", "resources/shaders/blur.fs");
+
 
 
 }
@@ -724,4 +729,81 @@ GLuint loadTexture(const char* path, int comp) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	return textureID;
+}
+
+void createFrameBuffer(int width, int height, unsigned int& frameBufferID, unsigned int& colorBufferID, unsigned int& depthBufferID) 
+{
+	glGenFramebuffers(1, &frameBufferID);
+
+	// Color Buffer
+	glGenTextures(1, &colorBufferID);
+	glBindTexture(GL_TEXTURE_2D, colorBufferID);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+	// Depth Buffer
+	glGenRenderbuffers(1, &depthBufferID);
+	glBindRenderbuffer(GL_RENDERBUFFER, depthBufferID);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+
+	// Attach buffers
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBufferID);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBufferID, 0);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBufferID);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+}
+
+void renderToBuffer(unsigned int frameBufferTo, unsigned int colorBufferFrom, unsigned int shader) {
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBufferTo);
+	glUseProgram(shader);
+
+	glClearColor(0.1f, 0.3f, 0.3f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, colorBufferFrom);
+
+	// Render quad
+	renderQuad();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad() {
+	if (quadVAO == 0) {
+		float quadVertices[] = {
+			// positions        // texture Coords
+			-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+			-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+			 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+			 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+		};
+
+		glGenVertexArrays(1, &quadVAO);
+		glGenBuffers(1, &quadVBO);
+
+		glBindVertexArray(quadVAO);
+		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	}
+
+	glBindVertexArray(quadVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glBindVertexArray(0);
+
 }
